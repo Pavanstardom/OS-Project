@@ -1,0 +1,110 @@
+#include <stdio.h>  
+#include <unistd.h>  
+#include <stdlib.h>  
+#include <pthread.h>  
+#include <semaphore.h>  
+#define MAX_STUDENTS 6 
+
+void randwait(int seconds);  
+void *teachingAssistant(void *);  
+void *student(void *studentId);  
+
+sem_t waitingRoom;  
+sem_t teachingAssistantRoom;  
+sem_t teachingAssistantPillow;  
+sem_t studentBelt; 
+
+
+int allDone = 0;  
+
+int main(int argc, char *argv[])  
+{ 
+    pthread_t TAid;  
+    pthread_t tid[MAX_STUDENTS];  
+    int p, count, numStudents, numChairs; int Number[MAX_STUDENTS];  //numeric id of each student.
+    printf("Maximum number of students can only be 6. Enter number of students and chairs \n"); 
+    scanf("%d",&count); 
+    numStudents = count;  
+    scanf("%d",&count); 
+    numChairs = count; 
+    if (numStudents > MAX_STUDENTS) {  
+       printf("The maximum number of Students is %d \n", MAX_STUDENTS);
+
+       return 0; 
+    } 
+
+    for (p= 0; p < MAX_STUDENTS; p++) {  
+        Number[p] = p;  
+    }  
+
+     
+    sem_init(&waitingRoom, 0, numChairs);  
+    sem_init(&teachingAssistantRoom, 0, 1); 
+    sem_init(&teachingAssistantPillow, 0, 0);  
+    sem_init(&studentBelt, 0, 0);  // student being served.
+     
+      
+    pthread_create(&TAid, NULL, teachingAssistant, NULL);  //TA function prototype.
+     
+      
+    for (p = 0; p < numStudents; p++) { 
+        pthread_create(&tid[p], NULL,student, (void *)&Number[p]);  
+    }  
+
+      
+    for (p = 0; p < numStudents; p++) {  
+        pthread_join(tid[p],NULL);  
+    }  
+
+    
+    allDone = 1; 
+ 
+    sem_post(&teachingAssistantPillow); //wake the teaching assistant.
+    pthread_join(TAid,NULL);  
+    return 0; 
+}  
+
+void *teachingAssistant(void *userInput)  
+{  
+
+    
+  while (!allDone) {   
+    printf("The teaching assistant is sleeping \n");  
+    sem_wait(&teachingAssistantPillow);
+    if (!allDone)  
+    { 
+     printf("The teaching Assistant is teaching to his student. \n"); //initialize the semaphores.
+     randwait(2); 
+     printf("The teaching Assistant finished teaching his student. \n");
+     sem_post(&studentBelt);  
+    }  
+    else {  
+         printf("The Teaching Assistant is Leaving. \n");  
+    }  
+   } 
+} 
+
+void *student(void *studentId) {  
+
+ int num = *(int *)studentId;
+
+     printf("Student %d going to teaching assistant room \n", num);  
+     randwait(5);  
+     printf("Student %d arrived at teaching assistant waiting room \n", num); 
+     sem_wait(&waitingRoom);  
+     printf("Student %d entering teaching assistant waiting room \n", num);// Wait for the teaching assistant room student chair to become free.  
+     sem_wait(&teachingAssistantRoom);  
+     sem_post(&waitingRoom);
+     printf("Student %d waking the  teachingAssistant \n", num);  
+     sem_post(&teachingAssistantPillow);
+     sem_wait(&studentBelt);   // Give up the chair.  
+     sem_post(&teachingAssistantRoom);  
+     printf("Student %d leaving from teaching assistant room \n", num);  //when all students are finished we cancel the thread.
+}  // release the mutex lock.
+
+
+     
+void randwait(int seconds) {  
+     int len = 1;
+     sleep(len);  
+} 
